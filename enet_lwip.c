@@ -52,6 +52,7 @@
 const u16_t COMM_PORT=30;               //tcp port number used for communication with control card
 struct tcp_pcb* active_comm_tcp_pcb;    //
 bool connection_active=false;           //indicates whether there is a current tcp connection active
+void setupCommInterface(void);
 
 
 // These are defined by the linker (see device linker command file)
@@ -726,26 +727,40 @@ void httpLEDToggle(void)
 // cCard specific code
 // *****************************************************************************
 
+// TCP received callback function is called when new data was received on COMM_PORT
+err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
+    if(err==ERR_OK){
+        // -- process the data in p , p is NULL if the remote host terminated the connection --
+        uint8_t* payload = malloc(p->len);
+        memcpy(payload,p->payload,p->len);
+        // -- indicate that bytes were read and we are ready to receive more data --
+        tcp_recved(tcppcb,p->len);   //indicate that no_bytes_read were read and we are ready to receive more data
+        // -- echo the received data back
+        tcp_write(tcppcb,payload,p->len,TCP_WRITE_FLAG_COPY);
+        return ERR_OK;
+    }
+    else{
+        //wait forever and preserve debug state
+        while(1);
+    }
+}
+
 // TCP accept callback function is called when an incoming TCP connection on COMM_PORT is established
-void accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
+err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
     if(err==ERR_OK){
         //assign the tcp pcb for the newly created tcp connection to the global tcp_pcb
         active_comm_tcp_pcb=new_pcb;
+        //set the connection active flag
+        connection_active=true;
+        //register callback for received data
+        tcp_recv(active_comm_tcp_pcb, tcp_recvd_cb);
+        return ERR_OK;
     }
     else{
         while(1){
             //wait forever to preserve debug state
         }
     }
-}
-
-// TCP received callback function is called when new data was received on COMM_PORT
-err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
-    // -- process the data in p , p is NULL if the remote host terminated the connection --
-    // -- indicate that bytes were read and we are ready to receive more data --
-//    u16_t no_bytes_read=0;              //number of bytes read by application that can be discarded now
-//    tcp_recved(tcppcb,no_bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
-    return ERR_OK;
 }
 
 //Setup the communication interface for the controlcard
@@ -761,9 +776,8 @@ void setupCommInterface(void){
     //switch the state of the TCP to LISTEN. Returns a new PCB for the TCP in LISTEN state
     struct tcp_pcb* listener_pcb=tcp_listen(connection_pcb);
     //start accepting connection for this TCP
-    void tcp_accept(listener_pcb,accept);
-
-    //register a receive callback function for the tcp
-    tcp_recv(active_comm_tcp_pcb, tcp_recvd_cb);
+    tcp_accept(listener_pcb,accept_cb);
+    // Hint: tcp_recv needs to be called after the tcp connection has accepted an incoming tcp connection request, e.g.
+    // tcp_recv (which registers the tcp receive data callback) needs to be called in the accept_cb callback function
 
 }
