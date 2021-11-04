@@ -48,6 +48,20 @@
 //
 //*****************************************************************************
 
+// ----------------- IPC Related ---------------
+#include "ipc.h"
+
+#define IPC_CMD_READ_MEM   0x1001
+#define IPC_CMD_RESP       0x2001
+
+#define TEST_PASS          0x5555
+#define TEST_FAIL          0xAAAA
+
+#pragma DATA_SECTION(readData, "MSGRAM_CM_TO_CPU1")
+uint32_t readData[10];
+uint32_t pass;
+// ---------------------------------------------
+
 // Control specific constants
 const u16_t COMM_PORT=30;               //tcp port number used for communication with control card
 struct tcp_pcb* active_comm_tcp_pcb;    //
@@ -640,6 +654,23 @@ main(void)
     // Initializing the CM. Loading the required functions to SRAM.
     //
     CM_init();
+    //clear all ipc flags
+    IPC_clearFlagLtoR(IPC_CM_L_CPU1_R, IPC_FLAG_ALL);
+    //synchronize both core using ipc flag31
+    IPC_sync(IPC_CM_L_CPU1_R, IPC_FLAG31);
+    //initial test ipc
+    int i;
+    for(i=0; i<10; i++){readData[i] = i;}
+    IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                    IPC_CMD_READ_MEM, (uint32_t)readData, 10);
+    IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+    if(IPC_getResponse(IPC_CM_L_CPU1_R) == TEST_PASS){pass = 1;}
+    else{pass = 0;}
+
+    //
+    // IPC Initialization for Communication with CPU1
+    //
+
 
     SYSTICK_setPeriod(systickPeriodValue);
     SYSTICK_enableCounter();
