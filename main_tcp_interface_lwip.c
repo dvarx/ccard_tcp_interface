@@ -33,6 +33,7 @@
 
 #include "lwip/apps/httpd.h"
 #include <stdbool.h>
+#include <string.h>
 
 #include "comm_interface.h"
 //*****************************************************************************
@@ -72,7 +73,7 @@ struct tcp_pcb* welcoming_socket_pcb;
 bool connection_active=false;           //indicates whether there is a current tcp connection active
 void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
-uint8_t buffer[512];                    //a buffer storing the last received byte
+uint8_t buffer[256];                    //a buffer storing the last received bytes
 bool command_available=false;           //indicates whether a new command has been received via TCP
 
 
@@ -735,10 +736,8 @@ main(void)
     //
     while(1){
         if(command_available){
-            //processCommand();
-            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                            IPC_CMD_READ_MEM, (uint32_t)readData, 10);
-            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+            processCommand();
+            command_available=false;
         }
 
     }
@@ -847,22 +846,15 @@ void setupCommInterface(void){
 }
 
 void processCommand(){
-    uint8_t command_code=buffer[0];
-    switch(command_code){
-        case STOP_ALL:
-            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                            STOP_ALL, (uint32_t)readData, 0);
-            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
-            break;
-        case BUCK_ENABLE_ALL:
-            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                            BUCK_ENABLE_ALL, (uint32_t)readData, 0);
-            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
-            break;
-        default:
-            break;
+    //strncmp returns 0 if the content of both strings are equal
+    if(!strncmp((char*)buffer,CMD_STOP,CMD_LENGTH)){
+        IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                        STOP_ALL, (uint32_t)readData, 0);
+        IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
     }
-    IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                    STOP_ALL, (uint32_t)readData, 0);
-    IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+    else if(!strncmp((char*)buffer,ENABLE_ALL_BUCK,CMD_LENGTH)){
+        IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                        BUCK_ENABLE_ALL, (uint32_t)readData, 0);
+        IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+    }
 }

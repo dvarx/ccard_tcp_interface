@@ -11,5 +11,9 @@
 
 enum command{STOP_ALL=0,BUCK_ENABLE_ALL=1};
 
+#define CMD_LENGTH 4
+
+extern const char CMD_STOP[4];
+extern const char ENABLE_ALL_BUCK[4];
 
 #endif /* COMM_INTERFACE_H_ */
