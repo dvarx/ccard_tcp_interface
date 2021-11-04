@@ -32,6 +32,9 @@
 #include "board_drivers/pinout.h"
 
 #include "lwip/apps/httpd.h"
+#include <stdbool.h>
+
+#include "comm_interface.h"
 //*****************************************************************************
 //
 //! \addtogroup master_example_list
@@ -60,6 +63,7 @@
 #pragma DATA_SECTION(readData, "MSGRAM_CM_TO_CPU1")
 uint32_t readData[10];
 uint32_t pass;
+void processCommand(void);
 // ---------------------------------------------
 
 // Control specific constants
@@ -68,7 +72,8 @@ struct tcp_pcb* welcoming_socket_pcb;
 bool connection_active=false;           //indicates whether there is a current tcp connection active
 void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
-uint8_t buffer[512];
+uint8_t buffer[512];                    //a buffer storing the last received byte
+bool command_available=false;           //indicates whether a new command has been received via TCP
 
 
 // These are defined by the linker (see device linker command file)
@@ -728,7 +733,15 @@ main(void)
     //
     // Loop forever. All the work is done in interrupt handlers.
     //
-    while(1);
+    while(1){
+        if(command_available){
+            //processCommand();
+            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                            IPC_CMD_READ_MEM, (uint32_t)readData, 10);
+            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+        }
+
+    }
 }
 
 //*****************************************************************************
@@ -769,12 +782,15 @@ err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
         tcp_close(tcppcb);
         // listen to new connections again
         tcp_accept(welcoming_socket_pcb,accept_cb);
+        return ERR_OK;
     }
     else{
         if(err==ERR_OK){
             // -- process the data in p , p is NULL if the remote host terminated the connection --
             memcpy(buffer,p->payload,p->len);
             u16_t bytes_read=p->len;
+            //indicate that a new command is available for processing in the buffer
+            command_available=true;
             // -- indicate that bytes were read and we are ready to receive more data --
             tcp_recved(tcppcb,bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
             // -- echo the received data back
@@ -828,4 +844,25 @@ void setupCommInterface(void){
     // Hint: tcp_recv needs to be called after the tcp connection has accepted an incoming tcp connection request, e.g.
     // tcp_recv (which registers the tcp receive data callback) needs to be called in the accept_cb callback function
 
+}
+
+void processCommand(){
+    uint8_t command_code=buffer[0];
+    switch(command_code){
+        case STOP_ALL:
+            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                            STOP_ALL, (uint32_t)readData, 0);
+            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+            break;
+        case BUCK_ENABLE_ALL:
+            IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                            BUCK_ENABLE_ALL, (uint32_t)readData, 0);
+            IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+            break;
+        default:
+            break;
+    }
+    IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                    STOP_ALL, (uint32_t)readData, 0);
+    IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
 }
