@@ -846,6 +846,24 @@ void setupCommInterface(void){
 }
 
 void processCommand(){
+    struct tnb_mns_msg msg;
+
+    int i=0;
+    //read the desired currents. the current for each coil is a two byte signed integer
+    for(i=0; i<6; i++){
+        msg.desCurrents[i]=*((int16_t*)(buffer+2*i));
+    }
+    //read the desired buck duties. the duty for each channel is a two byte unsigned integer
+    for(i=0; i<6; i++){
+        msg.desDuties[i]=*((uint16_t*)(buffer+OFFSET_DES_DUTIES+2*i));
+    }
+    //read the flag bytes
+    msg.stp_flg_byte=*((uint8_t*)(buffer+OFFSET_STP_FLG_BYTE));
+    msg.buck_flg_byte=*((uint8_t*)(buffer+OFFSET_BUCK_FLG_BYTE));
+    msg.regen_flg_byte=*((uint8_t*)(buffer+OFFSET_REGEN_FLG_BYTE));
+    msg.resen_flg_byte=*((uint8_t*)(buffer+OFFSET_RESEN_FLG_BYTE));
+
+    /*
     //strncmp returns 0 if the content of both strings are equal
     if(!strncmp((char*)buffer,CMD_STOP,CMD_LENGTH)){
         IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
@@ -857,4 +875,5 @@ void processCommand(){
                         BUCK_ENABLE_ALL, (uint32_t)readData, 0);
         IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
     }
+    */
 }
