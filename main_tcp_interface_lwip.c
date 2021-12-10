@@ -54,6 +54,7 @@
 
 // ----------------- IPC Related ---------------
 #include "ipc.h"
+#include <stdint.h>
 
 #define IPC_CMD_READ_MEM   0x1001
 #define IPC_CMD_RESP       0x2001
@@ -63,6 +64,9 @@
 
 #pragma DATA_SECTION(readData, "MSGRAM_CM_TO_CPU1")
 uint32_t readData[10];
+#pragma DATA_SECTION(ipc_msg_tnb_mns, "MSGRAM_CM_TO_CPU1")
+struct tnb_mns_msg ipc_msg_tnb_mns;
+
 uint32_t pass;
 void processCommand(void);
 // ---------------------------------------------
@@ -863,17 +867,11 @@ void processCommand(){
     msg.regen_flg_byte=*((uint8_t*)(buffer+OFFSET_REGEN_FLG_BYTE));
     msg.resen_flg_byte=*((uint8_t*)(buffer+OFFSET_RESEN_FLG_BYTE));
 
-    /*
-    //strncmp returns 0 if the content of both strings are equal
-    if(!strncmp((char*)buffer,CMD_STOP,CMD_LENGTH)){
-        IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                        STOP_ALL, (uint32_t)readData, 0);
-        IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
-    }
-    else if(!strncmp((char*)buffer,ENABLE_ALL_BUCK,CMD_LENGTH)){
-        IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                        BUCK_ENABLE_ALL, (uint32_t)readData, 0);
-        IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
-    }
-    */
+    //copy the data to the shared CM_CPU1 Ram
+    memcpy(&ipc_msg_tnb_mns,&msg,sizeof(msg));
+
+    //send IPC message from CM to CPU1
+    IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                    IPC_MSG_NEW_MSG, &ipc_msg_tnb_mns, sizeof(ipc_msg_tnb_mns));
+    IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
 }
