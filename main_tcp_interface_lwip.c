@@ -64,8 +64,10 @@
 
 #pragma DATA_SECTION(readData, "MSGRAM_CM_TO_CPU1")
 uint32_t readData[10];
-#pragma DATA_SECTION(ipc_msg_tnb_mns, "MSGRAM_CM_TO_CPU1")
 struct tnb_mns_msg ipc_msg_tnb_mns;
+#pragma DATA_SECTION(ipc_msg_tnb_mns_c2000, "MSGRAM_CM_TO_CPU1")
+struct tnb_mns_msg_c2000 ipc_msg_tnb_mns_c2000;
+
 
 uint32_t pass;
 void processCommand(void);
@@ -857,29 +859,25 @@ void setupCommInterface(void){
     tcp_accept(welcoming_socket_pcb,accept_cb);
 }
 
+struct tnb_mns_msg lastmsg={0};
 void processCommand(){
-    struct tnb_mns_msg msg;
-
-    int i=0;
-    //read the desired currents. the current for each coil is a two byte signed integer
-    for(i=0; i<6; i++){
-        msg.desCurrents[i]=*((int16_t*)(buffer+2*i));
-    }
-    //read the desired buck duties. the duty for each channel is a two byte unsigned integer
-    for(i=0; i<6; i++){
-        msg.desDuties[i]=*((uint16_t*)(buffer+OFFSET_DES_DUTIES+2*i));
-    }
-    //read the flag bytes
-    msg.stp_flg_byte=*((uint8_t*)(buffer+OFFSET_STP_FLG_BYTE));
-    msg.buck_flg_byte=*((uint8_t*)(buffer+OFFSET_BUCK_FLG_BYTE));
-    msg.regen_flg_byte=*((uint8_t*)(buffer+OFFSET_REGEN_FLG_BYTE));
-    msg.resen_flg_byte=*((uint8_t*)(buffer+OFFSET_RESEN_FLG_BYTE));
 
     //copy the data to the shared CM_CPU1 Ram
-    memcpy(&ipc_msg_tnb_mns,&msg,sizeof(msg));
+    memcpy(&ipc_msg_tnb_mns,&buffer,sizeof(ipc_msg_tnb_mns));
+    memcpy(&ipc_msg_tnb_mns_c2000,&buffer,sizeof(ipc_msg_tnb_mns));
+    ipc_msg_tnb_mns_c2000.buck_flg_byte=ipc_msg_tnb_mns.buck_flg_byte;
+    ipc_msg_tnb_mns_c2000.stp_flg_byte=ipc_msg_tnb_mns.stp_flg_byte;
+    ipc_msg_tnb_mns_c2000.regen_flg_byte=ipc_msg_tnb_mns.regen_flg_byte;
+    ipc_msg_tnb_mns_c2000.resen_flg_byte=ipc_msg_tnb_mns.resen_flg_byte;
+
+    //TODO : remove this
+//    if((ipc_msg_tnb_mns.buck_flg_byte!=0)||(ipc_msg_tnb_mns.stp_flg_byte!=0)||(ipc_msg_tnb_mns.regen_flg_byte!=0)||(ipc_msg_tnb_mns.resen_flg_byte!=0)){
+//        memcpy(&lastmsg,&ipc_msg_tnb_mns,sizeof(lastmsg));
+//    }
+
 
     //send IPC message from CM to CPU1
     IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
-                    IPC_MSG_NEW_MSG, &ipc_msg_tnb_mns, sizeof(ipc_msg_tnb_mns));
+                    IPC_MSG_NEW_MSG, &ipc_msg_tnb_mns_c2000, sizeof(ipc_msg_tnb_mns_c2000));
     IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
 }
