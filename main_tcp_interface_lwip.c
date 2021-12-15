@@ -120,7 +120,7 @@ uint32_t genericISRCustomRBUcount = 0;
 uint32_t genericISRCustomROVcount = 0;
 uint32_t genericISRCustomRIcount = 0;
 
-uint32_t systickPeriodValue = 15000000;
+uint32_t systickPeriodValue = 1000000;
 Ethernet_Pkt_Desc  pktDescriptorRXCustom[NUM_PACKET_DESC_RX_APPLICATION];
 extern uint32_t Ethernet_numGetPacketBufferCallback;
 extern Ethernet_Device Ethernet_device_struct;
@@ -806,6 +806,7 @@ err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
             command_available=true;
             // -- indicate that bytes were read and we are ready to receive more data --
             tcp_recved(tcppcb,bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
+            pbuf_free(p);
             // -- echo the received data back
             //tcp_write(tcppcb,buffer,bytes_read,TCP_WRITE_FLAG_COPY);
             return ERR_OK;
