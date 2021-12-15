@@ -79,6 +79,9 @@ void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
 uint8_t buffer[256];                    //a buffer storing the last received bytes
 bool command_available=false;           //indicates whether a new command has been received via TCP
+bool reset_connection=false;
+unsigned int tcp_connection_reset_counter=0;
+err_t tcp_recvd_cb(void*, struct tcp_pcb*, struct pbuf*,err_t);
 
 
 // These are defined by the linker (see device linker command file)
@@ -739,8 +742,12 @@ main(void)
     // Loop forever. All the work is done in interrupt handlers.
     //
     while(1){
+        if(reset_connection){
+            reset_connection=false;
+            tcp_recvd_cb(NULL,NULL,NULL,NULL);
+        }
         if(command_available){
-            processCommand();
+            //processCommand();
             command_available=false;
         }
 
@@ -779,12 +786,15 @@ void httpLEDToggle(void)
 // TCP received callback function is called when new data was received on COMM_PORT
 err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
     //payload being NULL indicated that the TCP connection has been terminated
-    if(p->payload==NULL||p->len==0){
+    if(p==NULL){
+        tcp_connection_reset_counter++;
         connection_active=false;
         // close the pcb
-        tcp_close(tcppcb);
+        if(tcp_close(tcppcb)!=ERR_OK){
+            while(1){}
+        }
         // listen to new connections again
-        tcp_accept(welcoming_socket_pcb,accept_cb);
+        //tcp_accept(welcoming_socket_pcb,accept_cb);
         return ERR_OK;
     }
     else{
@@ -797,7 +807,7 @@ err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
             // -- indicate that bytes were read and we are ready to receive more data --
             tcp_recved(tcppcb,bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
             // -- echo the received data back
-            tcp_write(tcppcb,buffer,bytes_read,TCP_WRITE_FLAG_COPY);
+            //tcp_write(tcppcb,buffer,bytes_read,TCP_WRITE_FLAG_COPY);
             return ERR_OK;
         }
         else{
@@ -823,8 +833,8 @@ err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
     }
 }
 
-/* Creates a new TCP Connection and sets the state of this connection to WAIT,
- * then waits for remote host to establish connection
+/*
+ * creates a TCP welcoming socket and sets it to LISTEN state
  */
 void setupCommInterface(void){
     //create a new tcp pcb
@@ -840,13 +850,10 @@ void setupCommInterface(void){
         }
         while(1){}
     }
-    //switch the state of the TCP to LISTEN. Returns a new PCB for the TCP in LISTEN state
+
     welcoming_socket_pcb=tcp_listen(connection_pcb);
     //start accepting connections on port COMM_PORT
     tcp_accept(welcoming_socket_pcb,accept_cb);
-    // Hint: tcp_recv needs to be called after the tcp connection has accepted an incoming tcp connection request, e.g.
-    // tcp_recv (which registers the tcp receive data callback) needs to be called in the accept_cb callback function
-
 }
 
 void processCommand(){

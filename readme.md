@@ -15,6 +15,7 @@ The network configuration of the Control Card is done in the `main` routine of t
 
 * Subnet Mask : `255.255.255.0`
 * IP : `192.168.0.4`
+* MAC-Address: `A8-63-F2-00-00-80`
 
 ## Compilation & Deploying
 
@@ -32,6 +33,12 @@ The network configuration of the Control Card is done in the `main` routine of t
 
   ![](\img\program_target.png)
 
+## Launching Multiple Cores for Debugging
+
+* Go to `Debug Configurations`->`Program` and for each core go to `Project`->`Workspace` and select the associated project.
+* Go to `Debug Configurations`->`Target`->`Auto Run and Launch Options` and check `Connect to the target on debugger startup`
+
 ## General Tips
 
 * When inspecting the binary contents of `buffer` use the memory browser with input `&buffer`. The variable preview will show the contents of `buffer` interpreted as ASCII characters since `uint8_t` is internally defined as `unsigned char`.
+* ROS Node Error Message `No Route To Host`: Use `sudo arp -s 192.168.0.4 A8:63:F2:00:00:80` to manually resolve the IP
