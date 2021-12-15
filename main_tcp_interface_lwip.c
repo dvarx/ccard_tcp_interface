@@ -747,7 +747,7 @@ main(void)
             tcp_recvd_cb(NULL,NULL,NULL,NULL);
         }
         if(command_available){
-            //processCommand();
+            processCommand();
             command_available=false;
         }
 
