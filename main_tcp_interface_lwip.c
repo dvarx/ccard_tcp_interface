@@ -859,6 +859,7 @@ void setupCommInterface(void){
     tcp_accept(welcoming_socket_pcb,accept_cb);
 }
 
+uint8_t debug_flagdetect=0;
 struct tnb_mns_msg lastmsg={0};
 void processCommand(){
 
@@ -869,6 +870,9 @@ void processCommand(){
     ipc_msg_tnb_mns_c2000.stp_flg_byte=ipc_msg_tnb_mns.stp_flg_byte;
     ipc_msg_tnb_mns_c2000.regen_flg_byte=ipc_msg_tnb_mns.regen_flg_byte;
     ipc_msg_tnb_mns_c2000.resen_flg_byte=ipc_msg_tnb_mns.resen_flg_byte;
+    if(ipc_msg_tnb_mns.buck_flg_byte!=0||ipc_msg_tnb_mns.regen_flg_byte!=0||ipc_msg_tnb_mns.resen_flg_byte!=0||ipc_msg_tnb_mns.stp_flg_byte!=0){
+        debug_flagdetect=1;
+    }
 
     //TODO : remove this
 //    if((ipc_msg_tnb_mns.buck_flg_byte!=0)||(ipc_msg_tnb_mns.stp_flg_byte!=0)||(ipc_msg_tnb_mns.regen_flg_byte!=0)||(ipc_msg_tnb_mns.resen_flg_byte!=0)){

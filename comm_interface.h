@@ -20,7 +20,9 @@ enum command{IPC_MSG_STOP_ALL=0,IPC_MSG_NEW_MSG=1};
  */
 struct tnb_mns_msg{
     int16_t desCurrents[NO_CHANNELS];
+    uint16_t desCurrentsRes[NO_CHANNELS];
     uint16_t desDuties[NO_CHANNELS];
+    uint32_t desFreqs[NO_CHANNELS];
     uint8_t stp_flg_byte;
     uint8_t buck_flg_byte;
     uint8_t regen_flg_byte;
@@ -28,8 +30,10 @@ struct tnb_mns_msg{
 };
 
 struct tnb_mns_msg_c2000{
-    int16_t desCurrents[NO_CHANNELS];
+    int16_t desCurrents[NO_CHANNELS];       //currents in [A]
+    uint16_t desCurrentsRes[NO_CHANNELS];   //currents in [A]
     uint16_t desDuties[NO_CHANNELS];
+    uint32_t desFreqs[NO_CHANNELS];         //frequencies in [mHz]
     uint16_t stp_flg_byte;
     uint16_t buck_flg_byte;
     uint16_t regen_flg_byte;
