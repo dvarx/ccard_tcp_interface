@@ -52,3 +52,7 @@ The network configuration of the Control Card is done in the `main` routine of t
 ## General Tips
 
 * When inspecting the binary contents of `buffer` use the memory browser with input `&buffer`. The variable preview will show the contents of `buffer` interpreted as ASCII characters since `uint8_t` is internally defined as `unsigned char`.
+
+## Error Log
+
+Linker Error `No Source Files - Nothing To Do` : Issue was that the -n flag was set in the ARM Compiler which caused `.asm` files to be generated instead of `.obj` files.te

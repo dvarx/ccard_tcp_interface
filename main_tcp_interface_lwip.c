@@ -79,7 +79,7 @@ struct tcp_pcb* welcoming_socket_pcb;
 bool connection_active=false;           //indicates whether there is a current tcp connection active
 void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
-uint8_t buffer[256];                    //a buffer storing the last received bytes
+uint8_t buffer[2048];                    //a buffer storing the last received bytes
 bool command_available=false;           //indicates whether a new command has been received via TCP
 bool reset_connection=false;
 unsigned int tcp_connection_reset_counter=0;
