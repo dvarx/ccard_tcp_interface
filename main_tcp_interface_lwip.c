@@ -62,11 +62,14 @@
 #define TEST_PASS          0x5555
 #define TEST_FAIL          0xAAAA
 
+
+// IPC Related variables
 #pragma DATA_SECTION(readData, "MSGRAM_CM_TO_CPU1")
 uint32_t readData[10];
 struct tnb_mns_msg ipc_msg_tnb_mns;
 #pragma DATA_SECTION(ipc_msg_tnb_mns_c2000, "MSGRAM_CM_TO_CPU1")
 struct tnb_mns_msg_c2000 ipc_msg_tnb_mns_c2000;
+struct tnb_mns_msg_sysstate tnb_mns_msg_systemstate;
 
 
 uint32_t pass;
@@ -76,6 +79,7 @@ void processCommand(void);
 // Control specific constants
 const u16_t COMM_PORT=30;               //tcp port number used for communication with control card
 struct tcp_pcb* welcoming_socket_pcb;
+struct tcp_pcb* current_tcp_pcb;        //stores a reference to the PCB for the currently active TCP connection
 bool connection_active=false;           //indicates whether there is a current tcp connection active
 void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
@@ -167,19 +171,6 @@ void CM_init(void)
 #endif
 
 }
-//*****************************************************************************
-//
-// HTTP Webserver related callbacks and definitions.
-//
-//*****************************************************************************
-//
-// Currently, this implemented as a pointer to function which is called when
-// corresponding query is received by the HTTP webserver daemon. When more
-// features are needed to be added, it should be implemented as a separate
-// interface.
-//
-void httpLEDToggle(void);
-void(*ledtoggleFuncPtr)(void) = &httpLEDToggle;
 
 //*****************************************************************************
 //
@@ -648,6 +639,23 @@ Ethernet_init(const unsigned char *mac)
                         ETHERNET_CHANNEL_0);
 }
 
+__interrupt void IPC_ISR1(){
+    uint32_t command,addr,data;
+    //read the message from CPU1
+    IPC_readCommand(IPC_CM_L_CPU1_R, IPC_FLAG1, IPC_ADDR_CORRECTION_ENABLE,
+                        &command, &addr, &data);
+
+    if(command==IPC_MSG_NEW_MSG){
+        memcpy(&tnb_mns_msg_systemstate,addr,sizeof(tnb_mns_msg_systemstate));
+    }
+    else{
+        while(1)
+            ;
+    }
+    //acknowledge IPC_FLAG1 which is used for CPU1->CM communication
+    IPC_ackFlagRtoL(IPC_CM_L_CPU1_R, IPC_FLAG1);
+    return;
+}
 
 //*****************************************************************************
 //
@@ -672,6 +680,11 @@ main(void)
     // Initializing the CM. Loading the required functions to SRAM.
     //
     CM_init();
+
+
+    //
+    // IPC Initialization for Communication with CPU1
+    //
     //clear all ipc flags
     IPC_clearFlagLtoR(IPC_CM_L_CPU1_R, IPC_FLAG_ALL);
     //synchronize both core using ipc flag31
@@ -684,11 +697,8 @@ main(void)
     IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
     if(IPC_getResponse(IPC_CM_L_CPU1_R) == TEST_PASS){pass = 1;}
     else{pass = 0;}
-
-    //
-    // IPC Initialization for Communication with CPU1
-    //
-
+    //TODO : set up ISR for CPU1_CM communication
+    IPC_registerInterrupt(IPC_CM_L_CPU1_R, IPC_INT1, IPC_ISR1);
 
     SYSTICK_setPeriod(systickPeriodValue);
     SYSTICK_enableCounter();
@@ -726,14 +736,9 @@ main(void)
     Ethernet_init(pucMACArray);
 
     //
-    // Initialze the lwIP library, using DHCP.
+    // Initialze the lwIP library, using static IP addresses.
     //
     lwIPInit(0, pucMACArray, IPAddr, NetMask, GWAddr, IPADDR_USE_STATIC);
-
-    //
-    // Initialize the HTTP webserver daemon.
-    //
-    //httpd_init();
 
     //
     // Initialize the ccard communication interface
@@ -751,8 +756,18 @@ main(void)
         if(command_available){
             processCommand();
             command_available=false;
+            //enqueue last system state update from CPU1 into send queue
+            err_t error=tcp_write(current_tcp_pcb,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate),0);
+            if(error!=0){
+                while(1)
+                    ;
+            }
+            //force TCP send buffer to be sent now
+            if(tcp_output(current_tcp_pcb)!=0){
+                while(1)
+                    ;
+            }
         }
-
     }
 }
 
@@ -764,21 +779,6 @@ main(void)
 void lwIPHostTimerHandler(void)
 {
 
-}
-
-
-//*****************************************************************************
-//
-// Called by lwIP Library. Toggles the led when a command is received by the
-// HTTP webserver.
-//
-//*****************************************************************************
-void httpLEDToggle(void)
-{
-    //
-    // Toggle the LED D1 on the control card.
-    //
-    GPIO_togglePin(DEVICE_GPIO_PIN_LED1);
 }
 
 // *****************************************************************************
@@ -827,6 +827,8 @@ err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
         connection_active=true;
         //register callback for received data
         tcp_recv(new_pcb, tcp_recvd_cb);
+        //store the address of the currently active TCP PCB
+        current_tcp_pcb=new_pcb;
         return ERR_OK;
     }
     else{
