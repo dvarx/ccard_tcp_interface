@@ -91,6 +91,7 @@ bool command_available=false;           //indicates whether a new command has be
 bool reset_connection=false;
 unsigned int tcp_connection_reset_counter=0;
 err_t tcp_recvd_cb(void*, struct tcp_pcb*, struct pbuf*,err_t);
+err_t lasterror=0;
 
 
 // These are defined by the linker (see device linker command file)
@@ -759,8 +760,8 @@ int main(void)
 
             //send udp response
             memcpy(send_buf->payload,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate));
-            err_t err=udp_sendto(current_udp_pcb,send_buf,&IPAddr_remote,COMM_PORT);
-            if(err!=ERR_OK){
+            lasterror=udp_sendto(current_udp_pcb,send_buf,&IPAddr_remote,COMM_PORT);
+            if(lasterror!=ERR_OK&lasterror!=ERR_RTE){
                 while(1)
                     ;
             }
