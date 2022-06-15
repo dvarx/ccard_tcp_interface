@@ -77,9 +77,11 @@ void processCommand(void);
 // ---------------------------------------------
 
 // Control specific constants
-const u16_t COMM_PORT=30;               //tcp port number used for communication with control card
+const u16_t COMM_PORT=3030;               //tcp port number used for communication with control card
+ip_addr_t IPAddr_remote={0xC0A80001};     //ip address of the remote pc
 struct tcp_pcb* welcoming_socket_pcb;
 struct tcp_pcb* current_tcp_pcb;        //stores a reference to the PCB for the currently active TCP connection
+struct udp_pcb* current_udp_pcb;
 bool connection_active=false;           //indicates whether there is a current tcp connection active
 void setupCommInterface(void);
 err_t accept_cb(void*,struct tcp_pcb*,err_t);
@@ -662,8 +664,7 @@ __interrupt void IPC_ISR1(){
 // This example demonstrates the use of the Ethernet Controller.
 //
 //*****************************************************************************
-int
-main(void)
+int main(void)
 {
     unsigned long ulUser0, ulUser1;
     unsigned char pucMACArray[8];
@@ -756,17 +757,17 @@ main(void)
         if(command_available){
             processCommand();
             command_available=false;
-            //enqueue last system state update from CPU1 into send queue
-            err_t error=tcp_write(current_tcp_pcb,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate),0);
-            if(error!=0){
-                while(1)
-                    ;
-            }
-            //force TCP send buffer to be sent now
-            if(tcp_output(current_tcp_pcb)!=0){
-                while(1)
-                    ;
-            }
+//            //enqueue last system state update from CPU1 into send queue
+//            err_t error=tcp_write(current_tcp_pcb,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate),0);
+//            if(error!=0){
+//                while(1)
+//                    ;
+//            }
+//            //force TCP send buffer to be sent now
+//            if(tcp_output(current_tcp_pcb)!=0){
+//                while(1)
+//                    ;
+//            }
         }
     }
 }
@@ -820,6 +821,17 @@ err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
     }
 }
 
+void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port){
+    // -- process the data in p --
+    memcpy(buffer,p->payload,p->len);
+    u16_t bytes_read=p->len;
+    // TODO : check size to ensure that an entire command has been received
+    //indicate that a new command is available for processing in the buffer
+    command_available=true;
+    pbuf_free(p);
+    return;
+}
+
 // TCP accept callback function is called when an incoming TCP connection on COMM_PORT is established
 err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
     if(err==ERR_OK){
@@ -842,10 +854,11 @@ err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
  * creates a TCP welcoming socket and sets it to LISTEN state
  */
 void setupCommInterface(void){
-    //create a new tcp pcb
-    struct tcp_pcb* connection_pcb = tcp_new();
+    //create a new udp pcb
+    current_udp_pcb = udp_new();
     //bind the pcb to the port comm_port
-    err_t err=tcp_bind(connection_pcb,IP_ANY_TYPE,COMM_PORT);
+    //this receives on port COMM_PORT from any IP address
+    err_t err=udp_bind(current_udp_pcb,IP_ANY_TYPE,COMM_PORT);
     if(err!=ERR_OK){
         if(err==ERR_USE){
             while(1){}
@@ -855,10 +868,10 @@ void setupCommInterface(void){
         }
         while(1){}
     }
+    //set the remote IP address and port for sending data via UDP
+    err=udp_connect(current_udp_pcb,&IPAddr_remote,COMM_PORT);
 
-    welcoming_socket_pcb=tcp_listen(connection_pcb);
-    //start accepting connections on port COMM_PORT
-    tcp_accept(welcoming_socket_pcb,accept_cb);
+    udp_recv(current_udp_pcb,udp_recv_cb,NULL);
 }
 
 uint8_t debug_flagdetect=0;
