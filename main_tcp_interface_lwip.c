@@ -750,10 +750,20 @@ int main(void)
     //
     // Loop forever. All the work is done in interrupt handlers.
     //
+    struct pbuf* send_buf=pbuf_alloc(PBUF_TRANSPORT,sizeof(tnb_mns_msg_systemstate),PBUF_RAM);
+
     while(1){
         if(command_available){
             processCommand();
             command_available=false;
+
+            //send udp response
+            memcpy(send_buf->payload,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate));
+            err_t err=udp_sendto(current_udp_pcb,send_buf,&IPAddr_remote,COMM_PORT);
+            if(err!=ERR_OK){
+                while(1)
+                    ;
+            }
         }
     }
 }
