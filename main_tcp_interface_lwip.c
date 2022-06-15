@@ -79,6 +79,7 @@ void processCommand(void);
 // Control specific constants
 const u16_t COMM_PORT=3030;               //tcp port number used for communication with control card
 ip_addr_t IPAddr_remote={0xC0A80001};     //ip address of the remote pc
+ip_addr_t IPAddr_local={0xC0A80004};
 struct tcp_pcb* welcoming_socket_pcb;
 struct tcp_pcb* current_tcp_pcb;        //stores a reference to the PCB for the currently active TCP connection
 struct udp_pcb* current_udp_pcb;
@@ -750,24 +751,9 @@ int main(void)
     // Loop forever. All the work is done in interrupt handlers.
     //
     while(1){
-        if(reset_connection){
-            reset_connection=false;
-            tcp_recvd_cb(NULL,NULL,NULL,NULL);
-        }
         if(command_available){
             processCommand();
             command_available=false;
-//            //enqueue last system state update from CPU1 into send queue
-//            err_t error=tcp_write(current_tcp_pcb,&tnb_mns_msg_systemstate,sizeof(tnb_mns_msg_systemstate),0);
-//            if(error!=0){
-//                while(1)
-//                    ;
-//            }
-//            //force TCP send buffer to be sent now
-//            if(tcp_output(current_tcp_pcb)!=0){
-//                while(1)
-//                    ;
-//            }
         }
     }
 }
@@ -786,41 +772,6 @@ void lwIPHostTimerHandler(void)
 // cCard specific code
 // *****************************************************************************
 
-// TCP received callback function is called when new data was received on COMM_PORT
-err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
-    //payload being NULL indicated that the TCP connection has been terminated
-    if(p==NULL){
-        tcp_connection_reset_counter++;
-        connection_active=false;
-        // close the pcb
-        if(tcp_close(tcppcb)!=ERR_OK){
-            while(1){}
-        }
-        // listen to new connections again
-        //tcp_accept(welcoming_socket_pcb,accept_cb);
-        return ERR_OK;
-    }
-    else{
-        if(err==ERR_OK){
-            // -- process the data in p , p is NULL if the remote host terminated the connection --
-            memcpy(buffer,p->payload,p->len);
-            u16_t bytes_read=p->len;
-            //indicate that a new command is available for processing in the buffer
-            command_available=true;
-            // -- indicate that bytes were read and we are ready to receive more data --
-            tcp_recved(tcppcb,bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
-            pbuf_free(p);
-            // -- echo the received data back
-            //tcp_write(tcppcb,buffer,bytes_read,TCP_WRITE_FLAG_COPY);
-            return ERR_OK;
-        }
-        else{
-            //wait forever and preserve debug state
-            while(1);
-        }
-    }
-}
-
 void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port){
     // -- process the data in p --
     memcpy(buffer,p->payload,p->len);
@@ -832,24 +783,6 @@ void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t
     return;
 }
 
-// TCP accept callback function is called when an incoming TCP connection on COMM_PORT is established
-err_t accept_cb(void * arg, struct tcp_pcb* new_pcb, err_t err){
-    if(err==ERR_OK){
-        //set the connection active flag
-        connection_active=true;
-        //register callback for received data
-        tcp_recv(new_pcb, tcp_recvd_cb);
-        //store the address of the currently active TCP PCB
-        current_tcp_pcb=new_pcb;
-        return ERR_OK;
-    }
-    else{
-        while(1){
-            //wait forever to preserve debug state
-        }
-    }
-}
-
 /*
  * creates a TCP welcoming socket and sets it to LISTEN state
  */
@@ -858,7 +791,7 @@ void setupCommInterface(void){
     current_udp_pcb = udp_new();
     //bind the pcb to the port comm_port
     //this receives on port COMM_PORT from any IP address
-    err_t err=udp_bind(current_udp_pcb,IP_ANY_TYPE,COMM_PORT);
+    err_t err=udp_bind(current_udp_pcb,IP_ANY_TYPE,3030);
     if(err!=ERR_OK){
         if(err==ERR_USE){
             while(1){}
@@ -869,7 +802,7 @@ void setupCommInterface(void){
         while(1){}
     }
     //set the remote IP address and port for sending data via UDP
-    err=udp_connect(current_udp_pcb,&IPAddr_remote,COMM_PORT);
+    //err=udp_connect(current_udp_pcb,&IPAddr_remote,COMM_PORT);
 
     udp_recv(current_udp_pcb,udp_recv_cb,NULL);
 }
