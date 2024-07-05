@@ -12,7 +12,7 @@
 
 enum command{IPC_MSG_STOP_ALL=0,IPC_MSG_NEW_MSG=1};
 
-#define NO_CHANNELS 6
+#define NO_CHANNELS 9
 
 /*
  * desCurrents : are in units of [mA]
@@ -23,10 +23,10 @@ struct tnb_mns_msg{
     uint16_t desCurrentsRes[NO_CHANNELS];
     uint16_t desDuties[NO_CHANNELS];
     uint32_t desFreqs[NO_CHANNELS];
-    uint8_t stp_flg_byte;
-    uint8_t buck_flg_byte;
-    uint8_t regen_flg_byte;
-    uint8_t  resen_flg_byte;
+    uint16_t stp_flg_byte;
+    uint16_t buck_flg_byte;
+    uint16_t regen_flg_byte;
+    uint16_t  resen_flg_byte;
 };
 
 struct tnb_mns_msg_c2000{
