@@ -67,6 +67,7 @@ uint32_t readData[10];
 struct tnb_mns_msg ipc_msg_tnb_mns;
 #pragma DATA_SECTION(ipc_msg_tnb_mns_c2000, "MSGRAM_CM_TO_CPU1")
 struct tnb_mns_msg_c2000 ipc_msg_tnb_mns_c2000;
+uint8_t sysstatebuffer[512];
 
 
 uint32_t pass;
@@ -810,7 +811,7 @@ err_t tcp_recvd_cb(void* arg, struct tcp_pcb* tcppcb, struct pbuf* p,err_t err){
             tcp_recved(tcppcb,bytes_read);   //indicate that no_bytes_read were read and we are ready to receive more data
             pbuf_free(p);
             // -- echo the received data back
-            //tcp_write(tcppcb,buffer,bytes_read,TCP_WRITE_FLAG_COPY);
+            tcp_write(tcppcb,sysstatebuffer,sizeof(struct tnb_mns_msg_sysstate),TCP_WRITE_FLAG_COPY);
             return ERR_OK;
         }
         else{
@@ -874,14 +875,16 @@ void processCommand(){
         debug_flagdetect=1;
     }
 
-    //TODO : remove this
-//    if((ipc_msg_tnb_mns.buck_flg_byte!=0)||(ipc_msg_tnb_mns.stp_flg_byte!=0)||(ipc_msg_tnb_mns.regen_flg_byte!=0)||(ipc_msg_tnb_mns.resen_flg_byte!=0)){
-//        memcpy(&lastmsg,&ipc_msg_tnb_mns,sizeof(lastmsg));
-//    }
-
-
     //send IPC message from CM to CPU1
     IPC_sendCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
                     IPC_MSG_NEW_MSG, &ipc_msg_tnb_mns_c2000, sizeof(ipc_msg_tnb_mns_c2000));
     IPC_waitForAck(IPC_CM_L_CPU1_R, IPC_FLAG0);
+
+    //wait for IPC message from CPU1 containing system state
+    uint32_t command,addr,datalen;
+    IPC_readCommand(IPC_CM_L_CPU1_R, IPC_FLAG0, IPC_ADDR_CORRECTION_ENABLE,
+                        &command, &addr, &datalen);
+    memcpy(&sysstatebuffer,(struct tnb_mns_msg_sysstate*)addr,sizeof(struct tnb_mns_msg_sysstate));
+
+
 }

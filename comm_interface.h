@@ -41,6 +41,16 @@ struct tnb_mns_msg_c2000{
 };
 
 
+//struct for receiving the state of the TNB MNS system
+struct tnb_mns_msg_sysstate{
+    uint16_t states[NO_CHANNELS];
+    int16_t currents[NO_CHANNELS];          // [mA]
+    uint16_t duties[NO_CHANNELS];
+    uint32_t freqs[NO_CHANNELS];
+    int16_t currents_res[NO_CHANNELS];      // [mA]
+};
+
+
 extern const unsigned int OFFSET_DES_DUTIES;
 extern const unsigned int OFFSET_STP_FLG_BYTE;
 extern const unsigned int OFFSET_BUCK_FLG_BYTE;
